@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Picketa — Crop Season Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    /* Official Picketa brand palette */
+    --green: #2D5F31;          /* spine / mid green */
+    --green-deep: #1D3A1F;     /* dark header green */
+    --green-light: #EAF3DE;    /* tint background */
+    --green-mid: #2D5F31;
+    --green-dark: #1D3A1F;
+    --picketa: #00E58A;        /* brand accent green */
+    --picketa-deep: #06B872;   /* legible accent variant */
+    --harvest: #C8932A;        /* warm gold accent */
+    --teal: #06B872;
+    --bg: #F7F8F4;
+    --bg2: #FFFFFF;
+    --border: #E3E6DD;
+    --text: #1F2A24;
+    --text2: #5C6660;
+    --text3: #9AA39C;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  h1, h2, h3 { font-family: 'Georgia', 'Cambria', serif; color: var(--green-deep); }
+
+  /* ── Header ── */
+  header { background: var(--green-deep); padding: 30px 40px 26px; display: flex; align-items: center; gap: 26px; border-bottom: 4px solid var(--picketa); }
+  header .logo-mark { height: 84px; flex-shrink: 0; display: flex; align-items: center; }
+  header .logo-mark img { height: 100%; width: auto; display: block; }
+  header .header-divider { width: 1px; align-self: stretch; background: rgba(255,255,255,0.18); }
+  header h1 { color: #fff; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
+  header p { color: rgba(255,255,255,0.65); font-size: 14px; margin-top: 8px; font-family: 'Inter', sans-serif; letter-spacing: 0.01em; }
+
+  /* ── Layout ── */
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 20px 40px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--green); margin-bottom: 10px; font-family: 'Inter', sans-serif; }
+
+  /* ── Map section ── */
+  .map-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+  .map-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .map-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+  .map-header p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .map-body { padding: 16px; }
+  #map-svg-wrap { width: 100%; position: relative; }
+
+  /* Zone legend pills */
+  .legend-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .legend-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); cursor: pointer; padding: 4px 10px; border-radius: 99px; border: 1px solid transparent; transition: border-color .15s; }
+  .legend-pill:hover { border-color: var(--border); }
+  .legend-pill.active { border-color: var(--text2); background: var(--bg); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+  /* ── Zone info cards ── */
+  .zone-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .zone-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; border-left: 4px solid transparent; cursor: pointer; transition: box-shadow .15s; }
+  .zone-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+  .zone-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .zone-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+  .zone-card h3 { font-size: 13px; font-weight: 600; flex: 1; }
+  .zone-toggle { font-size: 11px; color: var(--text3); white-space: nowrap; user-select: none; }
+  .zone-card .zone-provinces { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+  .zone-body { position: relative; overflow: hidden; max-height: 4.8em; transition: max-height .3s ease; }
+  .zone-body.expanded { max-height: 30em; }
+  .zone-body p { font-size: 12px; color: var(--text2); line-height: 1.6; margin: 0; }
+  .zone-fade { position: absolute; bottom: 0; left: 0; right: 0; height: 2em; background: linear-gradient(transparent, var(--bg2)); pointer-events: none; transition: opacity .2s; }
+  .zone-body.expanded .zone-fade { opacity: 0; }
+
+  /* ── Table section ── */
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-controls { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .table-controls label { font-size: 12px; color: var(--text2); }
+  .table-controls select { font-size: 12px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); cursor: pointer; }
+  .table-controls select:hover { border-color: var(--text3); }
+  .tbl-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { background: var(--green-light); color: var(--green); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid #F0EFE9; transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #F7F6F2; }
+  tbody td { padding: 8px 12px; vertical-align: middle; white-space: nowrap; }
+  .crop-name { font-weight: 600; font-size: 12px; }
+  .zone-badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 99px; }
+  .wk-num { font-weight: 600; }
+  .wk-label { font-size: 10px; color: var(--text3); margin-left: 2px; }
+  .phase-bars { display: flex; gap: 2px; margin-top: 3px; }
+  .pb { height: 5px; border-radius: 3px; }
+  .note-cell { font-size: 11px; color: var(--text2); min-width: 240px; max-width: 380px; white-space: normal; line-height: 1.5; }
+  .mid-cell { color: var(--picketa-deep); font-weight: 600; }
+
+
+
+  /* ── AI answer panel ── */
+  .ai-panel { display: none; padding: 14px 18px; background: #F7F9F5; border-bottom: 1px solid var(--border); }
+  .ai-panel.visible { display: block; }
+  .ai-panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ai-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--green-dark); background: var(--green-light); border: 1px solid rgba(45,95,49,0.2); border-radius: 99px; padding: 2px 9px; }
+  .ai-badge svg { width: 11px; height: 11px; }
+  /* thinking animation removed */
+  .ai-answer { font-size: 13px; color: var(--text); line-height: 1.65; }
+  .ai-answer strong { color: var(--green-dark); }
+  .ai-disclaimer { font-size: 10px; color: var(--text3); margin-top: 6px; font-style: italic; }
+
+  /* ── Map search ── */
+  .map-search-wrap { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .map-search-box { flex: 1; display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 99px; padding: 6px 14px; background: var(--bg); transition: border-color .15s, box-shadow .15s; }
+  .map-search-box:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(45,95,49,0.12); }
+  .map-search-box input { border: none; background: transparent; outline: none; font-size: 13px; font-family: inherit; color: var(--text); flex: 1; min-width: 0; }
+  .map-search-box input::placeholder { color: var(--text3); }
+  .btn-mic { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg2); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s, border-color .15s; }
+  .btn-mic:hover { background: var(--green-light); border-color: var(--green); }
+  .btn-mic.listening { background: #FEE2E2; border-color: #DC2626; animation: pulse 1s infinite; }
+  .btn-mic svg { width: 16px; height: 16px; }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+  .search-result-banner { display: none; align-items: center; gap: 8px; padding: 7px 18px; background: var(--green-light); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--green-dark); }
+  .search-result-banner.visible { display: flex; }
+  .search-result-banner strong { font-weight: 600; }
+  .btn-clear-search { margin-left: auto; font-size: 11px; color: var(--green); cursor: pointer; background: none; border: none; font-family: inherit; text-decoration: underline; }
+
+  /* Footer */
+  .footnote { font-size: 11px; color: var(--text3); padding: 10px 18px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark"><img src="data:image/png;base64,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" alt="Picketa"></div>
+  <div class="header-divider"></div>
+  <div>
+    <h1>Crop Season Reference</h1>
+    <p>Planting · mid-season · harvest timing by crop &amp; growing zone — Picketa Account Management</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- MAP -->
+  <div class="section-title" style="margin-top:4px;">Growing zone map</div>
+  <div class="map-wrap">
+    <div class="map-header">
+      <div>
+        <h2>US states &amp; Canadian provinces by growing zone</h2>
+        <p>Hover a state or province to identify its zone. Click the legend to highlight a zone.</p>
+      </div>
+    </div>
+    <div class="map-search-wrap">
+      <div class="map-search-box">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3);flex-shrink:0;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="map-search-input" type="text" placeholder="Ask a question or search a location… e.g. &quot;what crops grow in Idaho?&quot; or &quot;Ontario mid-season wheat&quot;" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn-mic" id="btn-mic" title="Search by voice">
+        <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+    </div>
+    <div class="search-result-banner" id="search-banner">
+      <span id="search-banner-text"></span>
+      <button class="btn-clear-search" id="btn-clear-search">Clear</button>
+    </div>
+    <div class="ai-panel" id="ai-panel">
+      <div class="ai-panel-header">
+        <span class="ai-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Quick Answer
+        </span>
+      </div>
+      <div id="ai-answer" class="ai-answer"></div>
+      <div class="ai-disclaimer" id="ai-disclaimer" style="display:none;">Based on data in this tool · Always verify timing with local agronomists.</div>
+    </div>
+    <div class="map-body">
+      <div id="map-svg-wrap"></div>
+    </div>
+    <div class="legend-row" id="map-legend"></div>
+  </div>
+
+  <!-- ZONE INFO -->
+  <div class="section-title">Zone background &amp; context</div>
+  <div class="zone-cards-grid" id="zone-cards"></div>
+
+  <!-- TABLE -->
+  <div class="section-title">Season timing reference table</div>
+  <div class="table-wrap">
+    <div class="table-controls">
+      <label>Crop:</label>
+      <select id="cropFilter">
+        <option value="all">All crops</option>
+        <option>Corn</option><option>Onion</option><option>Potato</option><option>Soybean</option>
+        <option>Spring canola</option><option>Spring wheat</option><option>Winter canola</option><option>Winter wheat</option>
+      </select>
+      <label>Zone:</label>
+      <select id="zoneFilter">
+        <option value="all">All zones</option>
+        <option>Northern US / Prairie Canada</option>
+        <option>Ontario</option>
+        <option>Atlantic Canada / Northeast US</option>
+        <option>Midwest / Central US</option>
+        <option>Southern US</option>
+        <option>Pacific Northwest</option>
+      </select>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Crop</th><th>Zone</th><th>Planting window</th>
+            <th>Mid-season</th><th>Harvest window</th>
+            <th>Wks plant→mid</th><th>Wks mid→harvest</th><th>Total weeks</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="footnote">Mid-season markers: Corn = silking/VT · Soybean = R3 pod · Potato = tuber initiation/canopy closure · Onion = leaf plateau/bulb swell · Wheat = heading/anthesis · Canola = flowering. If planting shifts, apply the same offset in weeks to mid-season and harvest.</div>
+  </div>
+</div>
+
+<script>
+const ZONES = [
+  { id:"prairie", name:"Northern US / Prairie Canada", color:"#378ADD", fill:"rgba(55,138,221,0.22)", stroke:"#185FA5",
+    provinces:["AB","SK","MB","MT","ND","SD","MN","WI","MI","WY","ID(north)"],
+    info:"The Prairie provinces — Alberta, Saskatchewan, and Manitoba — along with the northern US states form the shortest-season agricultural belt in North America. Hard winters and a frost-free window of roughly 90–120 days push growers toward short-season genetics: corn hybrids under 95 CRM, Group 00–0 soybeans, and open-pollinated canola bred for rapid maturity. The landscape is predominantly flat to gently rolling, dominated by black and dark-brown chernozem soils that are highly fertile but require careful moisture management in drier years. Spring seeding typically begins as soon as soils reach workable moisture — usually late April to mid-May — with harvest pressure mounting by late August before the risk of early frost." },
+  { id:"ontario", name:"Ontario", color:"#06B872", fill:"rgba(6,184,114,0.20)", stroke:"#0A6B47",
+    provinces:["ON"],
+    info:"Ontario is the most climatically diverse agricultural province in Canada, spanning from the warm, humid shores of Lake Erie in the southwest — comparable in heat units to parts of the US Midwest — to the shorter, cooler seasons of eastern Ontario near Ottawa. Southwestern Ontario, bound by Lakes Erie, Huron, and Ontario, is Canada's warmest agricultural zone and supports the country's largest corn and soybean acreage, longer-season hybrids (95–105 CRM corn, Group 1–2 soybeans), and even winter canola, which is almost nonexistent elsewhere in Canada. The Great Lakes moderate temperature extremes and extend the growing season by several weeks relative to the Prairies. Specialty zones include Holland Marsh (onions), Norfolk County (tobacco, ginseng, potatoes), and the Niagara Peninsula (tender fruit). Eastern Ontario transitions toward Atlantic-style conditions with shorter seasons and heavier clay soils." },
+  { id:"atlantic", name:"Atlantic Canada / Northeast US", color:"#7F77DD", fill:"rgba(127,119,221,0.22)", stroke:"#534AB7",
+    provinces:["NB","NS","PEI","NL","NY","PA","VT","NH","ME","MA"],
+    info:"The Atlantic Canada region — New Brunswick, Nova Scotia, Prince Edward Island, and Newfoundland — shares agroclimatic characteristics with the northeastern United States: cool summers, reliable late-season rainfall, and a compressed growing season that favors cool-weather crops. Prince Edward Island is Canada's dominant potato province, with red sandy loam soils ideal for seed and tablestock production. New Brunswick supports potato, grain, and blueberry production, while Nova Scotia is known for tree fruit and small grains. Corn and soybean acreage exists but is limited to the shortest available maturity groups (000–00 soybeans; silage corn dominant). Spring wheat and winter wheat are more economically significant here than in other parts of Atlantic Canada. The region's cooler temperatures help with disease pressure but compress the window for nitrogen uptake and mid-season tissue sampling." },
+  { id:"midwest", name:"Midwest / Central US", color:"#EF9F27", fill:"rgba(239,159,39,0.22)", stroke:"#854F0B",
+    provinces:["IA","IL","IN","OH","MO","KS","NE","CO","OK","AR","TN","KY"],
+    info:"The US Midwest — the Corn Belt at its core — is the most productive row-crop region in the world. Rich, deep mollisol soils (primarily Mollisols and Alfisols), reliable summer rainfall, and long growing seasons support full-season corn hybrids (100–115 CRM) and Group 2–3 soybeans. Planting begins as early as late April once soils reach 50°F at the 2-inch depth, and the race is to maximize heat unit accumulation before fall frost. Winter wheat is significant in Kansas, Nebraska, and Oklahoma, often double-cropped with soybeans. The region also supports significant onion, potato, and winter canola production in specific geographies. Nutrient management is intensive: tissue sampling at silking (corn) and R3 pod fill (soybean) provides actionable data during the highest-uptake windows of the season." },
+  { id:"south", name:"Southern US", color:"#D85A30", fill:"rgba(216,90,48,0.22)", stroke:"#993C1D",
+    provinces:["TX","LA","MS","AL","GA","FL","SC","NC","VA","WV"],
+    info:"The Southern US growing zone is defined by long, hot, humid summers with the longest frost-free window in North America — often exceeding 240 days. This enables double-cropping (winter wheat followed by soybeans is the dominant rotation), early spring planting of corn (March), and the use of long-season soybean varieties (Group 4–5) that would not mature in cooler regions. Heat stress during pollination is a significant production risk for corn, and disease pressure (gray leaf spot, southern blight, white mold in soybeans) is elevated relative to northern zones. Cotton, peanuts, and sweet potatoes are also significant crops in this zone, though they fall outside the current LENS crop list. Winter wheat is planted in October–November and harvested as early as late May in Texas, making it one of the earliest wheat harvests on the continent." },
+  { id:"pnw", name:"Pacific Northwest", color:"#2D5F31", fill:"rgba(45,95,49,0.20)", stroke:"#1D3A1F",
+    provinces:["WA","OR","ID","BC"],
+    info:"The Pacific Northwest — Washington, Oregon, Idaho, and British Columbia — is a geographically and climatically complex zone shaped by the Cascade Mountains. West of the Cascades, mild, wet winters and warm, dry summers define a maritime climate ideal for soft white wheat, grass seed, and specialty vegetables. East of the Cascades, the Columbia Basin and Snake River Plain offer an irrigated, semi-arid zone that is North America's most intensive potato production area. Idaho leads the US in potato production by a wide margin, with Columbia Basin operations in Washington closely behind. Spring wheat and winter wheat are both significant, with soft white wheat the dominant class. Winter canola acreage is growing in the Willamette Valley and Columbia Plateau. BC's agricultural zones range from the Fraser Valley (vegetables, small fruits) to the Peace River region in the northeast, which shares Prairie-like conditions and grows spring wheat and canola under similar constraints to Saskatchewan." },
+];
+
+const ZONE_BY_ID = {};
+ZONES.forEach(z => ZONE_BY_ID[z.id] = z);
+
+// State/province → zone mapping
+const STATE_ZONE = {
+  // Prairie / Northern
+  "Montana":"prairie","North Dakota":"prairie","South Dakota":"prairie","Minnesota":"prairie",
+  "Wisconsin":"prairie","Michigan":"prairie","Wyoming":"prairie",
+  // Ontario
+  "Ontario":"ontario",
+  // Atlantic
+  "New Brunswick":"atlantic","Nova Scotia":"atlantic","Prince Edward Island":"atlantic",
+  "Newfoundland and Labrador":"atlantic","New York":"atlantic","Pennsylvania":"atlantic",
+  "Vermont":"atlantic","New Hampshire":"atlantic","Maine":"atlantic","Massachusetts":"atlantic",
+  "Connecticut":"atlantic","Rhode Island":"atlantic","New Jersey":"atlantic","Delaware":"atlantic","Maryland":"atlantic",
+  // Midwest
+  "Iowa":"midwest","Illinois":"midwest","Indiana":"midwest","Ohio":"midwest",
+  "Missouri":"midwest","Kansas":"midwest","Nebraska":"midwest","Colorado":"midwest",
+  "Oklahoma":"midwest","Arkansas":"midwest","Tennessee":"midwest","Kentucky":"midwest",
+  "West Virginia":"midwest",
+  // South
+  "Texas":"south","Louisiana":"south","Mississippi":"south","Alabama":"south",
+  "Georgia":"south","Florida":"south","South Carolina":"south","North Carolina":"south",
+  "Virginia":"south",
+  // PNW
+  "Washington":"pnw","Oregon":"pnw","Idaho":"pnw","British Columbia":"pnw",
+  // Prairie Canada
+  "Alberta":"prairie","Saskatchewan":"prairie","Manitoba":"prairie",
+  // Territories — unzoned but show grey
+  "Yukon":"none","Northwest Territories":"none","Nunavut":"none",
+  // Others unzoned
+  "Alaska":"none","Hawaii":"none",
+  // Remaining US states fill in
+  "Nevada":"pnw","Utah":"midwest","New Mexico":"south","Arizona":"south",
+  "California":"pnw",
+  "Quebec":"atlantic","Prince Edward Island":"atlantic",
+};
+
+const PROV_CODE_TO_NAME = {
+  "AB":"Alberta","SK":"Saskatchewan","MB":"Manitoba","ON":"Ontario",
+  "QC":"Quebec","NB":"New Brunswick","NS":"Nova Scotia","PE":"Prince Edward Island",
+  "NL":"Newfoundland and Labrador","BC":"British Columbia","YT":"Yukon",
+  "NT":"Northwest Territories","NU":"Nunavut",
+};
+
+const DATA = [
+  {crop:"Corn",zone:"Northern US / Prairie Canada",plant:"May 10–25",mid:"Jul 15–Aug 1",harvest:"Sep 15–Oct 5",wkPM:10,wkMH:9,note:"Short-season corn varieties bred for cooler climates (85–95 day maturity). Mid-season is marked by silking — when pollen-bearing tassels shed and ear silks emerge."},
+  {crop:"Corn",zone:"Ontario",plant:"May 1–20",mid:"Jul 10–25",harvest:"Sep 10–Oct 5",wkPM:10,wkMH:10,note:"SW Ontario's Great Lakes climate supports longer-season corn (95–105 day maturity). Mid-season is silking — the critical pollination window. SE Ontario plants and matures about a week later."},
+  {crop:"Corn",zone:"Atlantic Canada / Northeast US",plant:"May 15–Jun 1",mid:"Jul 20–Aug 5",harvest:"Sep 20–Oct 10",wkPM:10,wkMH:9,note:"Growing season too short for grain corn in most areas; crop is harvested as silage (whole-plant feed) before full grain maturity. Mid-season marked by silking."},
+  {crop:"Corn",zone:"Midwest / Central US",plant:"Apr 25–May 15",mid:"Jul 10–25",harvest:"Sep 10–Oct 1",wkPM:11,wkMH:10,note:"Prime corn belt — full-season hybrids (100–115 day maturity) maximize yield. Mid-season is silking, when the plant pollinates. Nutrient uptake is highest in the weeks surrounding this stage."},
+  {crop:"Corn",zone:"Southern US",plant:"Mar 15–Apr 20",mid:"Jun 15–Jul 1",harvest:"Aug 20–Sep 15",wkPM:12,wkMH:10,note:"Long frost-free season allows a second crop after early wheat harvest. Planting as early as March captures more heat units, supporting longer-season varieties. Mid-season = silking."},
+  {crop:"Onion",zone:"Northern US / Prairie Canada",plant:"May 1–20",mid:"Jul 1–15",harvest:"Aug 15–Sep 10",wkPM:9,wkMH:7,note:"Onions are often started indoors as transplants for a head start. Mid-season begins when the plant shifts energy from leaf growth to active bulb sizing — a key nutrient demand window."},
+  {crop:"Onion",zone:"Ontario",plant:"Apr 20–May 10",mid:"Jun 25–Jul 10",harvest:"Aug 10–Sep 5",wkPM:10,wkMH:7,note:"Holland Marsh (north of Toronto) is Canada's main onion-producing region, with rich muck soils ideal for the crop. Both transplants and direct seeding are used. Mid-season = bulb sizing phase."},
+  {crop:"Onion",zone:"Atlantic Canada / Northeast US",plant:"May 1–20",mid:"Jul 1–15",harvest:"Aug 15–Sep 10",wkPM:9,wkMH:7,note:"Small but established onion acreage in NB and PEI. Long-day varieties are required — these only bulb up once day length exceeds ~15 hours, which happens naturally in northern summers."},
+  {crop:"Onion",zone:"Midwest / Central US",plant:"Apr 15–May 5",mid:"Jun 20–Jul 5",harvest:"Aug 5–Sep 5",wkPM:9,wkMH:7,note:"Mid-season is when the plant stops producing new leaves and redirects energy to swelling the bulb. This shift is the key tissue-sampling window for nutrient status."},
+  {crop:"Onion",zone:"Pacific Northwest",plant:"Mar 20–Apr 15",mid:"Jun 15–30",harvest:"Aug 1–Sep 1",wkPM:11,wkMH:7,note:"Idaho and eastern Oregon's high desert climate — hot days, cool nights, low humidity — produces some of the highest-quality storage onions in North America. Long-day varieties required at this latitude."},
+  {crop:"Potato",zone:"Northern US / Prairie Canada",plant:"May 5–20",mid:"Jul 5–20",harvest:"Sep 5–Oct 1",wkPM:9,wkMH:9,note:"Mid-season marks two overlapping events: tubers have finished initiating (setting the number of potatoes per plant) and the canopy has closed over the rows. This is the peak nutrient demand period."},
+  {crop:"Potato",zone:"Ontario",plant:"Apr 25–May 15",mid:"Jun 25–Jul 15",harvest:"Aug 25–Sep 25",wkPM:9,wkMH:9,note:"Norfolk County's light sandy soils and eastern Ontario's clay loams are the two main potato zones. Season timing closely mirrors the US Midwest. Mid-season = tuber bulking phase."},
+  {crop:"Potato",zone:"Atlantic Canada / Northeast US",plant:"May 10–25",mid:"Jul 5–20",harvest:"Sep 1–Oct 5",wkPM:8,wkMH:10,note:"PEI and NB are major seed potato producers — certified disease-free seed stock shipped across North America. Harvest is triggered by vine kill (chemically or mechanically killing the top growth) to set skin and stop tuber growth."},
+  {crop:"Potato",zone:"Midwest / Central US",plant:"Apr 20–May 10",mid:"Jun 25–Jul 15",harvest:"Aug 25–Sep 20",wkPM:9,wkMH:8,note:"Harvest begins after vine kill — deliberately killing the plant's top growth to halt tuber sizing and toughen the skin for storage. Timing of vine kill is a critical management decision."},
+  {crop:"Potato",zone:"Pacific Northwest",plant:"Apr 10–May 5",mid:"Jun 20–Jul 5",harvest:"Aug 20–Sep 20",wkPM:10,wkMH:9,note:"Idaho's Snake River Plain and WA's Columbia Basin are the most intensive potato-producing regions in North America, relying entirely on irrigation. Consistent water supply allows precise management of tuber bulking."},
+  {crop:"Soybean",zone:"Northern US / Prairie Canada",plant:"May 10–25",mid:"Jul 20–Aug 5",harvest:"Sep 20–Oct 10",wkPM:10,wkMH:9,note:"Maturity Group 00–0 varieties are bred for very short seasons. Mid-season is R3 (beginning pod) — when the first pods are visible and nutrient demand for seed fill peaks."},
+  {crop:"Soybean",zone:"Ontario",plant:"May 5–20",mid:"Jul 15–Aug 1",harvest:"Sep 15–Oct 10",wkPM:10,wkMH:10,note:"Ontario grows more soybeans than any other Canadian province, benefiting from its longer season. Group 1–2 varieties balance yield potential with reliable maturity. R3 (beginning pod) marks mid-season."},
+  {crop:"Soybean",zone:"Atlantic Canada / Northeast US",plant:"May 15–Jun 1",mid:"Jul 20–Aug 5",harvest:"Sep 15–Oct 5",wkPM:9,wkMH:8,note:"Extremely early-maturing varieties (Group 000–00) are required to ensure the crop matures before fall frost. The compressed season limits yield, but soybeans fit well in Atlantic rotations."},
+  {crop:"Soybean",zone:"Midwest / Central US",plant:"May 1–20",mid:"Jul 15–Aug 1",harvest:"Sep 15–Oct 10",wkPM:11,wkMH:9,note:"The heart of the US soybean belt. Group 2–3 varieties suit the Midwest's 130–150 frost-free days. R3 (beginning pod) is the mid-season trigger — nutrient uptake for seed fill is at its highest."},
+  {crop:"Soybean",zone:"Southern US",plant:"Apr 20–May 15",mid:"Jul 5–20",harvest:"Sep 5–Oct 1",wkPM:11,wkMH:9,note:"Longer-season Group 4–5 varieties thrive in the South's heat. Double-cropping — planting soybeans immediately after winter wheat harvest in June — is a widespread and profitable rotation."},
+  {crop:"Spring canola",zone:"Northern US / Prairie Canada",plant:"Apr 25–May 15",mid:"Jun 20–Jul 5",harvest:"Aug 10–Sep 5",wkPM:8,wkMH:7,note:"The Prairie provinces grow the vast majority of Canadian canola. Mid-season is marked by bolting — when the plant rapidly elongates and begins flowering. This is also the key window for sclerotinia fungal disease pressure."},
+  {crop:"Spring canola",zone:"Ontario",plant:"Apr 20–May 10",mid:"Jun 15–Jul 1",harvest:"Aug 5–Sep 1",wkPM:8,wkMH:7,note:"Canola acreage is growing in Ontario, using the same double-zero (00) low-erucic acid varieties as the Prairies. Season timing is slightly earlier than Prairie due to Ontario's warmer spring."},
+  {crop:"Spring canola",zone:"Atlantic Canada / Northeast US",plant:"May 1–20",mid:"Jun 25–Jul 10",harvest:"Aug 15–Sep 5",wkPM:8,wkMH:7,note:"Small but growing canola acreage in the Maritimes, typically rotated with spring wheat or barley. The crop benefits from Atlantic Canada's reliable summer moisture."},
+  {crop:"Spring canola",zone:"Pacific Northwest",plant:"Mar 20–Apr 20",mid:"Jun 1–20",harvest:"Jul 20–Aug 20",wkPM:9,wkMH:7,note:"Spring canola is grown in rotation with the dominant winter wheat crop in eastern WA and OR. The break crop helps manage cereal diseases and improves soil structure."},
+  {crop:"Spring wheat",zone:"Northern US / Prairie Canada",plant:"Apr 20–May 10",mid:"Jun 20–Jul 5",harvest:"Aug 5–Sep 1",wkPM:9,wkMH:7,note:"Mid-season is heading and anthesis — when the wheat head emerges from the leaf sheath and flowers. This is the most critical nutrient demand period and the ideal LENS tissue sampling window."},
+  {crop:"Spring wheat",zone:"Ontario",plant:"Apr 15–May 5",mid:"Jun 15–Jul 1",harvest:"Jul 25–Aug 25",wkPM:9,wkMH:7,note:"Winter wheat dominates Ontario's wheat acreage, but spring wheat is grown where fall establishment was missed or not practical. Heading and anthesis mark mid-season and the optimal tissue testing window."},
+  {crop:"Spring wheat",zone:"Atlantic Canada / Northeast US",plant:"Apr 25–May 15",mid:"Jun 25–Jul 10",harvest:"Aug 10–Sep 5",wkPM:8,wkMH:7,note:"Atlantic Canada's shorter frost-free window requires earlier-maturing spring wheat varieties. The crop fits well in 3–4 year rotations with potatoes and canola."},
+  {crop:"Spring wheat",zone:"Pacific Northwest",plant:"Mar 15–Apr 15",mid:"Jun 5–25",harvest:"Jul 20–Aug 20",wkPM:11,wkMH:7,note:"The PNW produces soft white wheat prized for Asian noodle and cracker markets. Lower-elevation areas in the Columbia Basin can plant earlier, extending the season and improving yield."},
+  {crop:"Winter canola",zone:"Ontario",plant:"Aug 15–Sep 5",mid:"Apr 10–30",harvest:"Jun 15–Jul 5",wkPM:33,wkMH:10,note:"Winter canola overwinters as a small rosette and resumes growth in spring. Flowering in April–May is both the mid-season marker and the critical window for sclerotinia stem rot infection — a key disease management decision point."},
+  {crop:"Winter canola",zone:"Midwest / Central US",plant:"Aug 15–Sep 5",mid:"Apr 15–May 1",harvest:"Jun 20–Jul 10",wkPM:32,wkMH:10,note:"Winter canola flowers in spring after breaking dormancy. Flowering is the mid-season marker and simultaneously the highest-risk period for sclerotinia stem rot, which infects through falling petals. Fungicide timing is critical."},
+  {crop:"Winter canola",zone:"Pacific Northwest",plant:"Aug 20–Sep 10",mid:"Apr 1–20",harvest:"Jun 10–Jul 5",wkPM:31,wkMH:10,note:"The Pacific Northwest is the primary US winter canola region. Mild winters allow reliable overwintering. Flowering arrives 2–3 weeks earlier than Midwest due to warmer spring temperatures."},
+  {crop:"Winter wheat",zone:"Northern US / Prairie Canada",plant:"Sep 1–20",mid:"May 10–25",harvest:"Jul 10–Aug 5",wkPM:35,wkMH:8,note:"Winter wheat is risky on the Prairies due to harsh winters, but is grown in sheltered areas of AB and SK. Jointing in spring — when the first stem node becomes detectable — marks the beginning of rapid growth and the mid-season nutrient window."},
+  {crop:"Winter wheat",zone:"Ontario",plant:"Sep 20–Oct 10",mid:"May 5–20",harvest:"Jul 5–Aug 1",wkPM:30,wkMH:8,note:"Ontario grows more winter wheat than any other province, sown after corn or soybean harvest in fall. Heading and anthesis in May mark mid-season and the ideal LENS tissue sampling window for nitrogen and sulphur status."},
+  {crop:"Winter wheat",zone:"Atlantic Canada / Northeast US",plant:"Sep 5–25",mid:"May 1–20",harvest:"Jul 5–Aug 5",wkPM:34,wkMH:9,note:"Winter wheat is well-suited to Atlantic Canada and the Northeast US, where reliable snow cover protects the crop through winter. The cooler spring slows green-up, extending the window for topdress nitrogen applications."},
+  {crop:"Winter wheat",zone:"Midwest / Central US",plant:"Sep 15–Oct 10",mid:"Apr 20–May 10",harvest:"Jun 20–Jul 15",wkPM:29,wkMH:8,note:"The Midwest is a major hard red and soft red winter wheat region. Heading and anthesis (flowering) in late April to early May is both the mid-season marker and the most important window for LENS tissue testing — nutrient status at this stage directly predicts grain protein and yield."},
+  {crop:"Winter wheat",zone:"Southern US",plant:"Oct 10–Nov 5",mid:"Mar 20–Apr 10",harvest:"May 20–Jun 15",wkPM:23,wkMH:8,note:"The Southern Plains sow winter wheat in October–November after summer crop harvest. Warmer winters mean an earlier spring green-up and the earliest wheat harvest in North America — often late May in Texas."},
+  {crop:"Winter wheat",zone:"Pacific Northwest",plant:"Sep 10–Oct 5",mid:"Apr 10–30",harvest:"Jul 1–Aug 1",wkPM:30,wkMH:11,note:"The PNW produces primarily soft white winter wheat for export and Asian flour markets. The Cascade foothills and Columbia Plateau offer reliable winter conditions and dry harvest weather."},
+];
+
+const ZONE_NAME_TO_ID = {
+  "Northern US / Prairie Canada":"prairie","Ontario":"ontario",
+  "Atlantic Canada / Northeast US":"atlantic","Midwest / Central US":"midwest",
+  "Southern US":"south","Pacific Northwest":"pnw"
+};
+
+// ── Build zone info cards ──
+const cardsGrid = document.getElementById("zone-cards");
+ZONES.forEach(z => {
+  const card = document.createElement("div");
+  card.className = "zone-card";
+  card.style.borderLeftColor = z.stroke;
+  card.innerHTML = `
+    <div class="zone-card-header">
+      <div class="zone-dot" style="background:${z.color};"></div>
+      <h3>${z.name}</h3>
+      <span class="zone-toggle">Read more ▾</span>
+    </div>
+    <div class="zone-provinces">${z.provinces.join(" · ")}</div>
+    <div class="zone-body">
+      <p>${z.info}</p>
+      <div class="zone-fade"></div>
+    </div>
+  `;
+  card.addEventListener("click", () => {
+    const body = card.querySelector(".zone-body");
+    const toggle = card.querySelector(".zone-toggle");
+    const expanded = body.classList.toggle("expanded");
+    toggle.textContent = expanded ? "Show less ▴" : "Read more ▾";
+  });
+  cardsGrid.appendChild(card);
+});
+
+// ── Build table ──
+function renderTable() {
+  const cF = document.getElementById("cropFilter").value;
+  const zF = document.getElementById("zoneFilter").value;
+  const rows = DATA.filter(r => (cF==="all"||r.crop===cF) && (zF==="all"||r.zone===zF));
+  const body = document.getElementById("tableBody");
+  body.innerHTML = "";
+  rows.forEach(r => {
+    const zid = ZONE_NAME_TO_ID[r.zone];
+    const z = ZONE_BY_ID[zid] || {};
+    const isWinter = r.crop.startsWith("Winter");
+    const total = r.wkPM + r.wkMH;
+    const w1 = Math.round((r.wkPM/total)*70);
+    const w2 = 70 - w1;
+    const c1 = isWinter ? "#5DBF8F" : "#06B872";
+    const c2 = "#C8932A";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="crop-name">${r.crop}</td>
+      <td><span class="zone-badge" style="background:${z.fill||'#eee'};color:${z.stroke||'#444'};border:1px solid ${z.stroke||'#ccc'};">${r.zone}</span></td>
+      <td>${r.plant}</td>
+      <td class="mid-cell">${r.mid}</td>
+      <td>${r.harvest}</td>
+      <td><span class="wk-num">${r.wkPM}</span><span class="wk-label">wks</span></td>
+      <td><span class="wk-num">${r.wkMH}</span><span class="wk-label">wks</span></td>
+      <td>
+        <span class="wk-num">${total}</span><span class="wk-label">wks</span>
+        <div class="phase-bars"><div class="pb" style="width:${w1}px;background:${c1};"></div><div class="pb" style="width:${w2}px;background:${c2};"></div></div>
+      </td>
+      <td class="note-cell">${r.note}</td>
+    `;
+    body.appendChild(tr);
+  });
+  if(!rows.length){
+    body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#9A9890;">No rows match the selected filters.</td></tr>';
+  }
+}
+document.getElementById("cropFilter").addEventListener("change", renderTable);
+document.getElementById("zoneFilter").addEventListener("change", renderTable);
+renderTable();
+
+// ── Map ──
+let activeZone = null;
+
+const tooltip = document.createElement("div");
+tooltip.style.cssText = "position:fixed;background:#1D3A1F;color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;white-space:nowrap;";
+document.body.appendChild(tooltip);
+
+const SKIP_PROVINCES = new Set(["Yukon","Northwest Territories","Nunavut","YT","NT","NU"]);
+
+const W = 960, TOTAL_H = 640;
+
+// Zoom controls UI — injected above the SVG
+const mapWrap = document.getElementById("map-svg-wrap");
+mapWrap.style.position = "relative";
+const zoomBar = document.createElement("div");
+zoomBar.style.cssText = "position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:4px;z-index:10;";
+zoomBar.innerHTML = `
+  <button id="zm-in"  title="Zoom in"  style="width:30px;height:30px;border:1px solid #D3D1C7;border-radius:6px;background:#fff;font-size:18px;line-height:1;cursor:pointer;color:#444;">+</button>
+  <button id="zm-out" title="Zoom out" style="width:30px;height:30px;border:1px solid #D3D1C7;border-radius:6px;background:#fff;font-size:18px;line-height:1;cursor:pointer;color:#444;">−</button>
+  <button id="zm-rst" title="Reset"    style="width:30px;height:30px;border:1px solid #D3D1C7;border-radius:6px;background:#fff;font-size:11px;line-height:1;cursor:pointer;color:#444;">↺</button>`;
+mapWrap.appendChild(zoomBar);
+
+const svg = d3.select("#map-svg-wrap").append("svg")
+  .attr("viewBox", `0 0 ${W} ${TOTAL_H}`)
+  .attr("width","100%")
+  .style("display","block")
+  .style("cursor","grab");
+
+// Clip map content so panned edges don't overflow
+svg.append("defs").append("clipPath").attr("id","map-clip")
+  .append("rect").attr("width", W).attr("height", TOTAL_H);
+
+svg.append("rect").attr("width",W).attr("height",TOTAL_H).attr("fill","#F0EFE9");
+
+// All zoomable content goes in this group
+const mapG = svg.append("g").attr("clip-path","url(#map-clip)");
+
+const proj = d3.geoAlbers()
+  .rotate([97, 0])
+  .center([0, 44])
+  .parallels([29, 59])
+  .scale(680)
+  .translate([W / 2, TOTAL_H / 2 + 50]);
+
+const path = d3.geoPath().projection(proj);
+
+function getZoneColor(name) {
+  const id = STATE_ZONE[name];
+  if (!id || id === "none") return null;
+  const z = ZONE_BY_ID[id];
+  if (!z) return null;
+  return { fill: z.fill, stroke: z.stroke, id };
+}
+
+function highlightZone(zid) {
+  svg.selectAll(".region-path").attr("opacity", d => {
+    const name = d.properties ? (d.properties.name || PROV_CODE_TO_NAME[d.id] || d.id) : "";
+    const rid = STATE_ZONE[name];
+    if (!rid || rid === "none") return zid ? 0.25 : 0.6;
+    if (!zid) return 1;
+    return rid === zid ? 1 : 0.2;
+  });
+}
+
+// D3 zoom behaviour
+const zoom = d3.zoom()
+  .scaleExtent([1, 12])
+  .on("zoom", (event) => {
+    const t = event.transform;
+    mapG.attr("transform", t);
+    // Keep stroke widths crisp — scale them down as we zoom in
+    const k = t.k;
+    svg.selectAll(".border-mesh").attr("stroke-width", 0.8 / k);
+    svg.selectAll(".region-path").attr("stroke-width", 0.6 / k);
+    svg.selectAll(".map-lbl").attr("font-size", Math.max(5, 7.5 / k));
+    // Cursor feedback
+    svg.style("cursor", k > 1 ? "grabbing" : "grab");
+  });
+
+svg.call(zoom);
+
+// Button handlers
+document.getElementById("zm-in") .addEventListener("click", () => svg.transition().duration(300).call(zoom.scaleBy, 1.6));
+document.getElementById("zm-out").addEventListener("click", () => svg.transition().duration(300).call(zoom.scaleBy, 0.625));
+document.getElementById("zm-rst").addEventListener("click", () => svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity));
+
+// Prevent page scroll when mouse is over map
+mapWrap.addEventListener("wheel", e => e.preventDefault(), { passive: false });
+
+const stateAbbr = {"Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA","Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA","Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD","Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO","Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC","South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT","Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY"};
+const tinyStates = new Set(["CT","DE","MA","MD","NH","NJ","RI","VT","DC"]);
+
+Promise.all([
+  d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"),
+  d3.json("https://cdn.jsdelivr.net/npm/datamaps@0.5.10/src/js/data/can.topo.json")
+]).then(([us, can]) => {
+
+  const usStates = topojson.feature(us, us.objects.states);
+  const usMesh   = topojson.mesh(us, us.objects.states, (a,b) => a !== b);
+
+  const contiguous = usStates.features.filter(d => {
+    const n = d.properties.name;
+    return n !== "Alaska" && n !== "Hawaii";
+  });
+
+  // US fills
+  mapG.selectAll(".us-state")
+    .data(contiguous)
+    .join("path")
+    .attr("class","region-path")
+    .attr("d", path)
+    .attr("fill", d => { const zc = getZoneColor(d.properties.name); return zc ? zc.fill : "#DDDBD2"; })
+    .attr("stroke", d => { const zc = getZoneColor(d.properties.name); return zc ? zc.stroke : "#B8B6AE"; })
+    .attr("stroke-width", 0.6)
+    .attr("opacity", 1)
+    .on("mousemove", (event, d) => {
+      const name = d.properties.name;
+      const rid = STATE_ZONE[name];
+      const z = rid && rid !== "none" ? ZONE_BY_ID[rid] : null;
+      tooltip.style.opacity = "1";
+      tooltip.style.left = (event.clientX + 14) + "px";
+      tooltip.style.top  = (event.clientY - 36) + "px";
+      tooltip.innerHTML  = `<strong>${name}</strong>${z ? `<br><span style="opacity:.7">${z.name}</span>` : ""}`;
+    })
+    .on("mouseleave", () => tooltip.style.opacity = "0");
+
+  // US border mesh
+  mapG.append("path")
+    .datum(usMesh)
+    .attr("class","border-mesh")
+    .attr("d", path)
+    .attr("fill", "none")
+    .attr("stroke", "rgba(255,255,255,0.75)")
+    .attr("stroke-width", 0.8);
+
+  // US labels
+  mapG.selectAll(".us-lbl")
+    .data(contiguous.filter(d => !tinyStates.has(stateAbbr[d.properties.name])))
+    .join("text")
+    .attr("class","map-lbl")
+    .attr("x", d => path.centroid(d)[0])
+    .attr("y", d => path.centroid(d)[1] + 3)
+    .attr("text-anchor","middle")
+    .attr("font-size", 7.5)
+    .attr("font-family","inherit")
+    .attr("fill","rgba(0,0,0,0.45)")
+    .attr("pointer-events","none")
+    .text(d => stateAbbr[d.properties.name] || "");
+
+  // Canadian provinces
+  const canFeatures = topojson.feature(can, can.objects.can);
+  const canMesh     = topojson.mesh(can, can.objects.can, (a,b) => a !== b);
+
+  const agriProvinces = canFeatures.features.filter(d => {
+    const raw = d.id || (d.properties && d.properties.postal) || ""; const code = raw.includes(".") ? raw.split(".").pop() : raw;
+    const name = PROV_CODE_TO_NAME[code] || (d.properties && d.properties.name) || code;
+    return !SKIP_PROVINCES.has(name) && !SKIP_PROVINCES.has(code);
+  });
+
+  mapG.selectAll(".can-prov")
+    .data(agriProvinces)
+    .join("path")
+    .attr("class","region-path")
+    .attr("d", path)
+    .attr("fill", d => {
+      const raw = d.id || (d.properties && d.properties.postal) || ""; const code = raw.includes(".") ? raw.split(".").pop() : raw;
+      const name = PROV_CODE_TO_NAME[code] || (d.properties && d.properties.name) || code;
+      const zc = getZoneColor(name);
+      return zc ? zc.fill : "#DDDBD2";
+    })
+    .attr("stroke", d => {
+      const raw = d.id || (d.properties && d.properties.postal) || ""; const code = raw.includes(".") ? raw.split(".").pop() : raw;
+      const name = PROV_CODE_TO_NAME[code] || (d.properties && d.properties.name) || code;
+      const zc = getZoneColor(name);
+      return zc ? zc.stroke : "#B8B6AE";
+    })
+    .attr("stroke-width", 0.6)
+    .attr("opacity", 1)
+    .on("mousemove", (event, d) => {
+      const raw = d.id || (d.properties && d.properties.postal) || ""; const code = raw.includes(".") ? raw.split(".").pop() : raw;
+      const name = PROV_CODE_TO_NAME[code] || (d.properties && d.properties.name) || code;
+      const rid  = STATE_ZONE[name];
+      const z    = rid && rid !== "none" ? ZONE_BY_ID[rid] : null;
+      tooltip.style.opacity = "1";
+      tooltip.style.left = (event.clientX + 14) + "px";
+      tooltip.style.top  = (event.clientY - 36) + "px";
+      tooltip.innerHTML  = `<strong>${name}</strong>${z ? `<br><span style="opacity:.7">${z.name}</span>` : ""}`;
+    })
+    .on("mouseleave", () => tooltip.style.opacity = "0");
+
+  mapG.append("path")
+    .datum(canMesh)
+    .attr("class","border-mesh")
+    .attr("d", path)
+    .attr("fill", "none")
+    .attr("stroke", "rgba(255,255,255,0.75)")
+    .attr("stroke-width", 0.8);
+
+  // Province labels
+  const tinyProvs = new Set(["PE","NS","NB","PEI"]);
+  mapG.selectAll(".can-lbl")
+    .data(agriProvinces)
+    .join("text")
+    .attr("class","map-lbl")
+    .attr("x", d => path.centroid(d)[0])
+    .attr("y", d => path.centroid(d)[1] + 3)
+    .attr("text-anchor","middle")
+    .attr("font-size", 7.5)
+    .attr("font-family","inherit")
+    .attr("fill","rgba(0,0,0,0.45)")
+    .attr("pointer-events","none")
+    .text(d => {
+      const raw = d.id || (d.properties && d.properties.postal) || "";
+      const code = raw.includes(".") ? raw.split(".").pop() : raw;
+      return tinyProvs.has(code) ? "" : code;
+    });
+
+  // 49th parallel line removed
+
+  // Footer label (outside zoomG so it stays fixed)
+  svg.append("text").attr("x", 52).attr("y", TOTAL_H - 12)
+    .attr("font-size","10").attr("fill","#9A9890").attr("font-family","inherit")
+    .attr("pointer-events","none")
+    .text("US states & Canadian agricultural provinces — Picketa crop season reference");
+
+  // Zoom hint
+  svg.append("text").attr("x", W - 10).attr("y", TOTAL_H - 12)
+    .attr("text-anchor","end")
+    .attr("font-size","10").attr("fill","#B4B2A9").attr("font-family","inherit")
+    .attr("pointer-events","none")
+    .text("Scroll to zoom · drag to pan");
+
+  // ── Legend ──
+  const legendRow = document.getElementById("map-legend");
+  ZONES.forEach(z => {
+    const pill = document.createElement("div");
+    pill.className = "legend-pill";
+    pill.dataset.zone = z.id;
+    pill.innerHTML = `<div class="legend-dot" style="background:${z.color};"></div>${z.name}`;
+    pill.addEventListener("click", () => {
+      if (activeZone === z.id) {
+        activeZone = null;
+        document.querySelectorAll(".legend-pill").forEach(p => p.classList.remove("active"));
+        highlightZone(null);
+        document.getElementById("zoneFilter").value = "all";
+        renderTable();
+      } else {
+        activeZone = z.id;
+        document.querySelectorAll(".legend-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+        highlightZone(z.id);
+        document.getElementById("zoneFilter").value = z.name;
+        renderTable();
+      }
+    });
+    legendRow.appendChild(pill);
+  });
+
+}).catch(err => {
+  document.getElementById("map-svg-wrap").innerHTML = '<p style="color:#791F1F;padding:16px;font-size:13px;">Map data could not be loaded. Check your internet connection and refresh the page.</p>';
+  console.error(err);
+});
+
+
+// ── Map search ──
+const ALL_REGIONS = [
+  // US states
+  ...["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+      "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+      "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+      "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+      "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+      "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+      "Virginia","Washington","West Virginia","Wisconsin","Wyoming"],
+  // Canadian provinces (agricultural)
+  "Alberta","Saskatchewan","Manitoba","Ontario","Quebec","New Brunswick",
+  "Nova Scotia","Prince Edward Island","British Columbia","Newfoundland and Labrador"
+];
+
+function extractRegionName(query) {
+  const q = query.toLowerCase().trim();
+  // Strip common plain-language prefixes
+  const stripped = q
+    .replace(/^(find|show|locate|where is|where's|highlight|look up|search for|get|tell me about|go to|take me to|show me)\s+/i, '')
+    .replace(/\s+(on the map|on map|please|for me)$/i, '')
+    .trim();
+
+  // Try exact match first
+  for (const r of ALL_REGIONS) {
+    if (stripped === r.toLowerCase()) return r;
+  }
+  // Try contains match
+  for (const r of ALL_REGIONS) {
+    if (stripped.includes(r.toLowerCase()) || r.toLowerCase().includes(stripped)) return r;
+  }
+  // Abbreviation lookup
+  const abbrevMap = {
+    "al":"Alabama","ak":"Alaska","az":"Arizona","ar":"Arkansas","ca":"California",
+    "co":"Colorado","ct":"Connecticut","de":"Delaware","fl":"Florida","ga":"Georgia",
+    "hi":"Hawaii","id":"Idaho","il":"Illinois","in":"Indiana","ia":"Iowa","ks":"Kansas",
+    "ky":"Kentucky","la":"Louisiana","me":"Maine","md":"Maryland","ma":"Massachusetts",
+    "mi":"Michigan","mn":"Minnesota","ms":"Mississippi","mo":"Missouri","mt":"Montana",
+    "ne":"Nebraska","nv":"Nevada","nh":"New Hampshire","nj":"New Jersey","nm":"New Mexico",
+    "ny":"New York","nc":"North Carolina","nd":"North Dakota","oh":"Ohio","ok":"Oklahoma",
+    "or":"Oregon","pa":"Pennsylvania","ri":"Rhode Island","sc":"South Carolina",
+    "sd":"South Dakota","tn":"Tennessee","tx":"Texas","ut":"Utah","vt":"Vermont",
+    "va":"Virginia","wa":"Washington","wv":"West Virginia","wi":"Wisconsin","wy":"Wyoming",
+    "ab":"Alberta","sk":"Saskatchewan","mb":"Manitoba","on":"Ontario","qc":"Quebec",
+    "nb":"New Brunswick","ns":"Nova Scotia","pe":"Prince Edward Island","pei":"Prince Edward Island",
+    "bc":"British Columbia","nl":"Newfoundland and Labrador","nfld":"Newfoundland and Labrador"
+  };
+  if (abbrevMap[stripped]) return abbrevMap[stripped];
+  return null;
+}
+
+function doRegionSearch(name) {
+  if (!name) {
+    showBanner(null);
+    highlightZone(null);
+    activeZone = null;
+    document.querySelectorAll(".legend-pill").forEach(p => p.classList.remove("active"));
+    document.getElementById("zoneFilter").value = "all";
+    renderTable();
+    // Reset any bold outlines
+    svg.selectAll(".region-path").attr("stroke-width", null).attr("stroke", d => {
+      const n = d.properties ? (d.properties.name || PROV_CODE_TO_NAME[(d.id||"").split(".").pop()] || d.id) : "";
+      const zc = getZoneColor(n);
+      return zc ? zc.stroke : "#B8B6AE";
+    });
+    return;
+  }
+
+  const rid = STATE_ZONE[name];
+  if (!rid || rid === "none") {
+    showBanner(name, null);
+    return;
+  }
+  const zone = ZONE_BY_ID[rid];
+
+  // Flash / highlight the specific region with a bold stroke
+  svg.selectAll(".region-path").each(function(d) {
+    const n = d.properties ? (d.properties.name || PROV_CODE_TO_NAME[(d.id||"").split(".").pop()] || d.id) : "";
+    if (n === name) {
+      d3.select(this)
+        .raise()
+        .attr("stroke", "#FFD700")
+        .attr("stroke-width", 2.5)
+        .attr("opacity", 1);
+    } else {
+      d3.select(this).attr("opacity", 0.2).attr("stroke-width", null);
+    }
+  });
+
+  // Pan/zoom to that feature
+  svg.selectAll(".region-path").each(function(d) {
+    const n = d.properties ? (d.properties.name || PROV_CODE_TO_NAME[(d.id||"").split(".").pop()] || d.id) : "";
+    if (n === name) {
+      const bounds = path.bounds(d);
+      const dx = bounds[1][0] - bounds[0][0];
+      const dy = bounds[1][1] - bounds[0][1];
+      const cx = (bounds[0][0] + bounds[1][0]) / 2;
+      const cy = (bounds[0][1] + bounds[1][1]) / 2;
+      const scale = Math.max(1, Math.min(8, 0.85 / Math.max(dx / W, dy / TOTAL_H)));
+      const tx = W / 2 - scale * cx;
+      const ty = TOTAL_H / 2 - scale * cy;
+      svg.transition().duration(600).call(
+        zoom.transform,
+        d3.zoomIdentity.translate(tx, ty).scale(scale)
+      );
+    }
+  });
+
+  // Select zone in legend + table
+  activeZone = rid;
+  document.querySelectorAll(".legend-pill").forEach(p => {
+    p.classList.toggle("active", p.dataset.zone === rid);
+  });
+  document.getElementById("zoneFilter").value = zone.name;
+  renderTable();
+  showBanner(name, zone);
+}
+
+function showBanner(name, zone) {
+  const banner = document.getElementById("search-banner");
+  const text   = document.getElementById("search-banner-text");
+  if (!name) {
+    banner.classList.remove("visible");
+    return;
+  }
+  if (!zone) {
+    text.innerHTML = `<strong>${name}</strong> — no growing zone assigned (likely a territory or untracked region).`;
+  } else {
+    text.innerHTML = `<strong>${name}</strong> is in the <strong>${zone.name}</strong> growing zone.`;
+  }
+  banner.classList.add("visible");
+}
+
+const searchInput = document.getElementById("map-search-input");
+searchInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    const name = extractRegionName(searchInput.value);
+    doRegionSearch(name);
+  }
+});
+searchInput.addEventListener("input", () => {
+  if (!searchInput.value.trim()) doRegionSearch(null);
+});
+
+document.getElementById("btn-clear-search").addEventListener("click", () => {
+  searchInput.value = "";
+  doRegionSearch(null);
+});
+
+// Voice search — single instance, never recreated, to avoid repeated permission prompts
+const micBtn = document.getElementById("btn-mic");
+let recognition = null;
+let micInitialised = false;
+
+function initMic() {
+  if (micInitialised) return;
+  micInitialised = true;
+
+  if (!("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
+    micBtn.title = "Voice search not supported in this browser";
+    micBtn.style.opacity = "0.4";
+    micBtn.style.cursor = "not-allowed";
+    return;
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.continuous = false;
+
+  // Single consolidated onresult — handles both map search and AI
+  recognition.onresult = e => {
+    const transcript = e.results[0][0].transcript;
+    searchInput.value = transcript;
+    const name = extractRegionName(transcript);
+    if (name) doRegionSearch(name);
+    if (typeof isQuestion === 'function' && isQuestion(transcript)) {
+      const ans = answerQuestion(transcript);
+      if (ans) showAnswer(ans);
+    }
+  };
+
+  recognition.onend = () => {
+    micBtn.classList.remove("listening");
+    micBtn.title = "Search by voice";
+  };
+
+  recognition.onerror = e => {
+    micBtn.classList.remove("listening");
+    micBtn.title = "Search by voice";
+    if (e.error !== 'no-speech') console.warn('Speech recognition error:', e.error);
+  };
+}
+
+micBtn.addEventListener("click", () => {
+  initMic();
+  if (!recognition) return;
+
+  if (micBtn.classList.contains("listening")) {
+    recognition.stop();
+  } else {
+    micBtn.classList.add("listening");
+    micBtn.title = "Listening… click to stop";
+    try { recognition.start(); }
+    catch(e) { /* already started */ }
+  }
+});
+
+
+
+// ── AI Summary Tool ──
+// ── Built-in Question Engine (no API needed) ──
+
+// Helper: find the zone name for a region by name
+function getZoneForRegion(name) {
+  const rid = STATE_ZONE[name];
+  if (!rid || rid === 'none') return null;
+  return ZONE_BY_ID[rid] ? ZONE_BY_ID[rid].name : null;
+}
+
+// Helper: get all crops for a zone name
+function getCropsForZone(zoneName) {
+  const rows = DATA.filter(r => r.zone === zoneName);
+  const crops = [...new Set(rows.map(r => r.crop))];
+  return crops;
+}
+
+// Helper: get all states/provinces in a zone
+function getRegionsForZone(zoneName) {
+  return Object.entries(STATE_ZONE)
+    .filter(([k, v]) => ZONE_BY_ID[v] && ZONE_BY_ID[v].name === zoneName)
+    .map(([k]) => k)
+    .sort();
+}
+
+// Helper: find a crop name mentioned in query
+function extractCropName(q) {
+  const cropMap = {
+    'corn': 'Corn', 'maize': 'Corn',
+    'onion': 'Onion', 'onions': 'Onion',
+    'potato': 'Potato', 'potatoes': 'Potato', 'spud': 'Potato', 'spuds': 'Potato',
+    'soybean': 'Soybean', 'soybeans': 'Soybean', 'soy': 'Soybean',
+    'spring canola': 'Spring canola', 'canola': 'Spring canola',
+    'winter canola': 'Winter canola',
+    'spring wheat': 'Spring wheat',
+    'winter wheat': 'Winter wheat', 'wheat': 'Spring wheat',
+  };
+  const lower = q.toLowerCase();
+  // Check two-word crops first
+  for (const [k, v] of Object.entries(cropMap)) {
+    if (k.includes(' ') && lower.includes(k)) return v;
+  }
+  // Then single-word
+  for (const [k, v] of Object.entries(cropMap)) {
+    if (!k.includes(' ') && lower.includes(k)) return v;
+  }
+  return null;
+}
+
+// Helper: find a timing aspect mentioned
+function extractTimingAspect(q) {
+  const lower = q.toLowerCase();
+  if (/mid.?season|mid.?point|middle|halfway|halfway|midpoint/.test(lower)) return 'mid';
+  if (/harvest|harvest window|when.*harvest|ready/.test(lower)) return 'harvest';
+  if (/plant|planting|sow|seed|when.*start/.test(lower)) return 'plant';
+  if (/how long|weeks|duration|season length|total/.test(lower)) return 'duration';
+  return null;
+}
+
+// Format a data row into a readable timing sentence
+function formatTiming(row, aspect) {
+  const base = `<strong>${row.crop}</strong> in the <strong>${row.zone}</strong> zone`;
+  switch(aspect) {
+    case 'plant':
+      return `${base}: typical planting window is <strong>${row.plant}</strong>.`;
+    case 'mid':
+      return `${base}: mid-season falls around <strong>${row.mid}</strong> — approximately ${row.wkPM} weeks after planting. ${row.note}.`;
+    case 'harvest':
+      return `${base}: harvest window is <strong>${row.harvest}</strong>, roughly ${row.wkMH} weeks after mid-season. ${row.note}.`;
+    case 'duration':
+      return `${base}: the full season runs approximately <strong>${row.wkPM + row.wkMH} weeks</strong> — ${row.wkPM} weeks from planting to mid-season, then ${row.wkMH} weeks to harvest.`;
+    default:
+      return `${base}: plant <strong>${row.plant}</strong> · mid-season <strong>${row.mid}</strong> · harvest <strong>${row.harvest}</strong>. ${row.note}.`;
+  }
+}
+
+// Main question answering function
+function answerQuestion(query) {
+  const q = query.toLowerCase().trim();
+  const region = extractRegionName(query);
+  const crop = extractCropName(q);
+  const aspect = extractTimingAspect(q);
+  const zoneName = region ? getZoneForRegion(region) : null;
+
+  // Pattern: region + crop → specific timing row
+  if (region && crop && zoneName) {
+    const rows = DATA.filter(r => r.zone === zoneName && r.crop === crop);
+    if (rows.length) return formatTiming(rows[0], aspect);
+  }
+
+  // Pattern: region + aspect (no specific crop) → list all crops with that timing
+  if (region && zoneName && aspect && !crop) {
+    const rows = DATA.filter(r => r.zone === zoneName);
+    if (!rows.length) return `No crop data found for the <strong>${zoneName}</strong> zone.`;
+    const lines = rows.map(r => formatTiming(r, aspect));
+    return `Here are the <strong>${aspect === 'mid' ? 'mid-season' : aspect}</strong> timings for all crops in <strong>${region}</strong> (${zoneName} zone):<br><br>` + lines.join('<br>');
+  }
+
+  // Pattern: region only → zone ID + all crops grown there
+  if (region && zoneName && !crop && !aspect) {
+    const crops = getCropsForZone(zoneName);
+    const zone = ZONES.find(z => z.name === zoneName);
+    return `<strong>${region}</strong> is in the <strong>${zoneName}</strong> growing zone. ` +
+      `Crops tracked in this zone include: <strong>${crops.join(', ')}</strong>. ` +
+      (zone ? zone.info.split('.')[0] + '.' : '');
+  }
+
+  // Pattern: crop only (no region) → list all zones that grow it
+  if (crop && !region) {
+    const rows = DATA.filter(r => r.crop === crop);
+    if (!rows.length) return `No data found for <strong>${crop}</strong>.`;
+    if (aspect) {
+      const lines = rows.map(r => formatTiming(r, aspect));
+      return `<strong>${aspect === 'mid' ? 'Mid-season' : aspect.charAt(0).toUpperCase() + aspect.slice(1)}</strong> timing for <strong>${crop}</strong> across all zones:<br><br>` + lines.join('<br>');
+    }
+    const lines = rows.map(r =>
+      `<strong>${r.zone}</strong>: plant ${r.plant} · mid ${r.mid} · harvest ${r.harvest}`
+    );
+    return `<strong>${crop}</strong> is grown in ${rows.length} zone${rows.length > 1 ? 's' : ''}:<br><br>` + lines.join('<br>');
+  }
+
+  // Pattern: zone name mentioned directly
+  const matchedZone = ZONES.find(z => q.includes(z.name.toLowerCase()));
+  if (matchedZone) {
+    const crops = getCropsForZone(matchedZone.name);
+    return `The <strong>${matchedZone.name}</strong> zone grows: <strong>${crops.join(', ')}</strong>. ${matchedZone.info.split('.')[0]}.`;
+  }
+
+  // Pattern: "what crops" or "all crops" with a region
+  if (region && zoneName && /crop|grow|what|list/.test(q)) {
+    const crops = getCropsForZone(zoneName);
+    return `Crops tracked in <strong>${region}</strong> (${zoneName} zone): <strong>${crops.join(', ')}</strong>.`;
+  }
+
+  return null; // no match
+}
+
+function isQuestion(text) {
+  const q = text.trim().toLowerCase();
+  const questionWords = ['what','when','where','why','how','which','who','is','are','does','do','can','tell me','explain','describe','find','show','give','list','all'];
+  const hasQuestion = questionWords.some(w => q.startsWith(w));
+  const hasRegion = !!extractRegionName(text);
+  const hasCrop = !!extractCropName(q);
+  const hasTiming = !!extractTimingAspect(q);
+  return hasQuestion || (hasRegion && (hasCrop || hasTiming)) || (hasCrop && q.length > 6);
+}
+
+function showAnswer(answer) {
+  const aiPanel = document.getElementById('ai-panel');
+  const aiAnswer = document.getElementById('ai-answer');
+  const aiDisclaimer = document.getElementById('ai-disclaimer');
+  aiPanel.classList.add('visible');
+  aiAnswer.innerHTML = answer;
+  aiDisclaimer.style.display = 'block';
+}
+
+function hideAIPanel() {
+  document.getElementById('ai-panel').classList.remove('visible');
+  document.getElementById('ai-answer').innerHTML = '';
+  document.getElementById('ai-disclaimer').style.display = 'none';
+}
+
+// Wire up search input — Enter key
+const _origInput = searchInput.oninput;
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const val = searchInput.value.trim();
+    if (!val) return;
+    const region = extractRegionName(val);
+    if (region) doRegionSearch(region);
+    if (isQuestion(val)) {
+      const answer = answerQuestion(val);
+      if (answer) {
+        showAnswer(answer);
+      } else {
+        showAnswer(`<em style="color:var(--text3)">Try asking something like: "What crops grow in Idaho?" or "When is mid-season for corn in Ontario?"</em>`);
+      }
+    } else if (!region) {
+      hideAIPanel();
+    }
+  }
+});
+
+// Voice AI integration handled in initMic()
+document.getElementById('btn-clear-search').addEventListener('click', hideAIPanel, false);
+
+
+</script>
+</body>
+</html>
