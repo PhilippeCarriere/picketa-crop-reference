@@ -411,7 +411,7 @@ const tooltip = document.createElement("div");
 tooltip.style.cssText = "position:fixed;background:#1D3A1F;color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;white-space:nowrap;";
 document.body.appendChild(tooltip);
 
-const SKIP_PROVINCES = new Set(["Yukon","Northwest Territories","Nunavut","YT","NT","NU"]);
+const SKIP_PROVINCES = new Set(["Yukon","Northwest Territories","Nunavut","YT","NT","NU","-99"]);
 
 const W = 960, TOTAL_H = 640;
 
@@ -1069,4 +1069,4 @@ document.getElementById('btn-clear-search').addEventListener('click', hideAIPane
 
 </script>
 </body>
-</html>
+</
